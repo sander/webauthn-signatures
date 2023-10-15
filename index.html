@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Using WebAuthn for non-repudiation</title>
+<link rel="stylesheet" href="main.css" />
+<script src="cbor.js"></script>
+<script src="jsrsasign-all-min.js"></script>
+<script type="module" src="main.mjs"></script>
+<h1>Using WebAuthn for non-repudiation</h1>
+<p>
+  <a href="https://www.w3.org/TR/webauthn-3/">Web Authentication</a> is designed
+  for web application to authenticate their users. But what if we would hack it
+  to enable third parties to verify signatures on messages and other documents?
+  Such as this one:
+</p>
+<form id="ui">
+  <p>
+    <label>
+      <output name="encoded"></output> data to sign
+      <textarea name="data" spellcheck="false">SGVsbG8sIFdvcmxkIQ==</textarea>
+    </label>
+  </p>
+  <p>
+    We need to use a web application to generate an assertion. What to use as a
+    <code>challenge</code>? Let’s use a domain-separated hash digest of the data
+    to sign:
+  </p>
+  <pre>sha256(utf8("WebAuthnSig\n") || &lt;data&gt;)</pre>
+  <p>
+    Note that the assertion signature also signs authenticator data
+    <code>adv</code>, and wraps the <code>challenge</code> in a JSON structure
+    as follows, where <code>cds</code> is some client data suffix:
+  </p>
+  <pre>
+&lt;adv&gt; || sha256(utf8('{"type":"webauthn.get","challenge":"') || base64url(challenge) || &lt;cds&gt;)</pre
+  >
+  <p>This leads to a short representation:</p>
+  <p>
+    <button name="sign">Sign</button>
+    <label>
+      <output name="verified"></output> signature
+      <textarea name="signature" spellcheck="false">
+{"adv":"SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2MFAAAAmg","cds":"Iiwib3JpZ2luIjoiaHR0cDovL2xvY2FsaG9zdDo4MDAwIn0","sig":"4y4PiaVDHb72YXGO0tjkdFMybjHTnYhBXtsAwppafoOaeLw8iYiH_a06lE7oemfrfF26vn_iBrevj9R7EQyp5g"}</textarea
+      >
+    </label>
+  </p>
+  <p>
+    Note that <code>adv</code> leaks
+    <a href="https://w3c.github.io/webauthn/#authenticator-data"
+      >authenticator data</a
+    >
+    to relying parties. Also <code>cds</code> leaks the web application’s
+    origin. We could further anonymize this format by encoding hash state data
+    instead of input data.
+  </p>
+  <p>
+    But now verification is easy using the
+    <a href="https://www.w3.org/TR/WebCryptoAPI/">Web Cryptography API</a> and
+    the credential’s verification key:
+  </p>
+  <p>
+    <label>
+      <output name="valid"></output> verification key
+      <textarea name="key" spellcheck="false">
+{"kty":"EC","crv":"P-256","x":"TEyTPauGmRhxDBsF11GmcSQIjhaI1dhETIMKbzZIZMA","y":"zsIYcdMtLmu1-xT-iGn_4bC-wW1MeEM4cJuAWPr72KQ"}</textarea
+      >
+    </label>
+  </p>
+  <p>
+    Upon credential creation, the authenticator may sign a key attestation, as
+    evidence of the quality of the key. Note that this is common for roaming
+    (cross-platform) authenticators, not for passkeys. A certificate authority
+    could validate this attestation before certifying the key:
+  </p>
+  <p>
+    <label>
+      <output>🪪</output> Key attestation (not validated)
+      <textarea name="attestation" spellcheck="false">
+{"cdh":"k0cIEov08uYTzu9VwSIMuccTktTJ0o2xreMZy1k6_Bk","att":"o2NmbXRmcGFja2VkZ2F0dFN0bXSjY2FsZyZjc2lnWEYwRAIgEKO28O1frllDBVTVmt2OU_KMXySsmCsfbgW0SGkTy9ACIH4KmBQLCi5FPiZytjE82aEuFhrfY0ZtLsx1OYVEnTqWY3g1Y4FZAsAwggK8MIIBpKADAgECAgQDrfASMA0GCSqGSIb3DQEBCwUAMC4xLDAqBgNVBAMTI1l1YmljbyBVMkYgUm9vdCBDQSBTZXJpYWwgNDU3MjAwNjMxMCAXDTE0MDgwMTAwMDAwMFoYDzIwNTAwOTA0MDAwMDAwWjBtMQswCQYDVQQGEwJTRTESMBAGA1UECgwJWXViaWNvIEFCMSIwIAYDVQQLDBlBdXRoZW50aWNhdG9yIEF0dGVzdGF0aW9uMSYwJAYDVQQDDB1ZdWJpY28gVTJGIEVFIFNlcmlhbCA2MTczMDgzNDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABBmeh5wWLbfcOe5KQqBGFqWzCf7KCS92vglI-W1ulcrkzGXNVKBZz73HybMbKx1sGER5wsBh9BiqlUtZaiwc-hejbDBqMCIGCSsGAQQBgsQKAgQVMS4zLjYuMS40LjEuNDE0ODIuMS43MBMGCysGAQQBguUcAgEBBAQDAgQwMCEGCysGAQQBguUcAQEEBBIEEPormdyeOUJXj5JKMNI8QRgwDAYDVR0TAQH_BAIwADANBgkqhkiG9w0BAQsFAAOCAQEAKOuzZ_7R2PDiievKn_bYB1fGDprlfLFyjJscOMq7vYTZI32oMawhlJ8PLfwMMWv9sXWzbmOiK7tYDq3KUoDQeYQOWh4lcmJaO_uHYDPb-yKpack4uJzhcTWUAKElLZcCqRKT1UUZ6WDdIs6KJ-sF6355t1DAAv7ZAWtxHsmtdFAb2RTLvo7ZVxKBt09E6wd85h7LBquFqXJVJn7o45gr9D8Msho4LSNeueTObbKYxAVCUEAjKyth4QzXDGIVvAO36UBxtw4S0cR_lmVaLvmdTOVafxtLH_kU7hNtnmEgRxSIZGmIgEQxFmU4ibhkhtnJyf-8k4VFNWmzRXRLjKC0N2hhdXRoRGF0YVjESZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NFAAAAmformdyeOUJXj5JKMNI8QRgAQBMcUzCBtQ0mUCpM2xpzlnGzGcQ51LxfnncFoqFEle1Q0TF1ZT7won_NN0K_vRGWeG2AesL_FDh_Gk90s_1Ay3elAQIDJiABIVggTEyTPauGmRhxDBsF11GmcSQIjhaI1dhETIMKbzZIZMAiWCDOwhhx0y0ua7X7FP6Iaf_hsL7BbUx4Qzhwm4BY-vvYpA"}</textarea
+      >
+    </label>
+  </p>
+  <p>
+    The signer just needs access to their authenticator, to the web application,
+    and to their credential:
+  </p>
+  <p>
+    <button name="create">Create</button>
+    <label>
+      <output>🖋️</output> Credential
+      <textarea
+        name="id"
+        spellcheck="false"
+        placeholder="ExxTMIG1DSZQKkzbGnOWcbMZxDnUvF+edwWioUSV7VDRMXVlPvCif803Qr+9EZZ4bYB6wv8UOH8aT3Sz/UDLdw=="
+      ></textarea>
+    </label>
+  </p>
+  <p>
+    In case the web application is not anymore available at the origin, the
+    signer would need to either use the
+    <a
+      href="https://fidoalliance.org/specs/fido-v2.0-ps-20190130/fido-client-to-authenticator-protocol-v2.0-ps-20190130.html"
+      >Client to Authenticator Protocol</a
+    >
+    directly with the same authenticator and credential, or make the original
+    web application available to their browser at the same origin.
+  </p>
+  <p>
+    Again, this is a hack. The user experience is not great. If you want
+    non-repudiation, use a qualified signature creation device instead.
+  </p>
+  <p>
+    This demo uses open source dependencies to parse attestations and signatures:</p>
+    <pre class="licenses"><a href="https://github.com/hildjj/node-cbor">node-cbor</a>
+The MIT License (MIT)
+
+Copyright (c) 2021 Joe Hildebrand
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+<a href="https://github.com/kjur/jsrsasign">jsrsasign</a>
+The 'jsrsasign'(RSA-Sign JavaScript Library) License
+
+Copyright (c) 2010-2021 Kenji Urushima
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+LICENSE: MIT License
+----
+
+RSA and ECC in JavaScript
+
+Copyright (c) 2003-2005  Tom Wu All Rights Reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS-IS" AND WITHOUT WARRANTY OF ANY KIND, 
+EXPRESS, IMPLIED OR OTHERWISE, INCLUDING WITHOUT LIMITATION, ANY 
+WARRANTY OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.  
+
+IN NO EVENT SHALL TOM WU BE LIABLE FOR ANY SPECIAL, INCIDENTAL,
+INDIRECT OR CONSEQUENTIAL DAMAGES OF ANY KIND, OR ANY DAMAGES WHATSOEVER
+RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER OR NOT ADVISED OF
+THE POSSIBILITY OF DAMAGE, AND ON ANY THEORY OF LIABILITY, ARISING OUT
+OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+In addition, the following condition applies:
+
+All redistributions must retain an intact copy of this copyright notice
+and disclaimer.
+
+http://www-cs-students.stanford.edu/~tjw/jsbn/
+LICENSE: BSD License
+FILES: ext/{base64,jsbn,jsbn2,prgn4,rng,rsa,rsa2}.js
+----
+
+CryptoJS
+
+Copyright (c) 2009-2013 Jeff Mott
+
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of this software and associated documentation files (the
+"Software"), to deal in the Software without restriction, including
+without limitation the rights to use, copy, modify, merge, publish,
+distribute, sublicense, and/or sell copies of the Software, and to
+permit persons to whom the Software is furnished to do so, subject to
+the following conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+https://code.google.com/p/crypto-js/wiki/License
+FILES: ext/cryptojs-*.js
+----
+
+Bitcoin JS
+
+Copyright (c) 2011 Stefan Thomas
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+https://github.com/bitcoinjs/bitcoinjs-lib
+LICENSE: MIT License
+FILES: src/ecdsa-modified.js src/ec-patch.js
+----
+</pre>
+  </p>
+</form>
+
+<footer>
+  <a class="p-author h-card" href="https://sanderdijkhuis.nl/" lang="nl"
+    >Sander D&#307;khuis</a
+  >
+  <span>/2023/</span>
+  <time class="dt-published" datetime="2023-10-22T00:17:00+02:00">Oct 22</time>
+  <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/"
+    >CC BY-SA</a
+  > <a href="https://github.com/sander/webauthn-signatures">Repository</a>
+</footer>

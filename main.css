@@ -1,0 +1,136 @@
+@font-face {
+  font-family: "NG_sdnl";
+  font-weight: normal;
+  src: url("https://sanderdijkhuis.nl/type/nittigrotesk-semilight-v20.eot");
+  src: url("https://sanderdijkhuis.nl/type/nittigrotesk-semilight-v20.eot?#iefix")
+      format("embedded-opentype"),
+    url("https://sanderdijkhuis.nl/type/nittigrotesk-semilight-v20.woff")
+      format("woff");
+}
+@font-face {
+  font-family: "NG_sdnl";
+  font-weight: bold;
+  src: url("https://sanderdijkhuis.nl/type/nittigrotesk-medium-v20.eot");
+  src: url("https://sanderdijkhuis.nl/type/nittigrotesk-medium-v20.eot?#iefix")
+      format("embedded-opentype"),
+    url("https://sanderdijkhuis.nl/type/nittigrotesk-medium-v20.woff")
+      format("woff");
+}
+
+body {
+  font-family: NG_sdnl, ui-monospace, system-ui;
+  font-size: 18px;
+  margin: 12px auto;
+  padding: 0 12px;
+  background: #fff;
+  color: #111;
+  font-weight: normal;
+  max-width: 40em;
+}
+
+body,
+textarea {
+  line-height: 1.4;
+}
+
+a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+h1 {
+  font-size: inherit;
+  text-align: center;
+  font-weight: bold;
+  margin: 4em 0 2em 0;
+}
+
+pre,
+code {
+  background: #eee;
+  font-family: inherit;
+  padding: 0 3px;
+  color: #555;
+}
+
+code {
+  padding: 0 3px;
+}
+
+pre {
+  padding: 12px;
+  background: #fff;
+  border: 1px solid #eee;
+}
+
+label {
+  line-height: 2em;
+  display: block;
+  margin: 2em -12px;
+  color: #555;
+  font-weight: bold;
+}
+
+output {
+  margin-left: 12px;
+}
+
+textarea {
+  font-size: 100%;
+  font-family: ui-monospace;
+  font-family: inherit;
+  font-weight: normal;
+  width: 100%;
+  display: block;
+  border-width: 1px;
+  border-color: #aaa;
+  border-left: 0;
+  border-right: 0;
+  padding: 12px;
+  border-radius: 0;
+  color: inherit;
+  background: #eee;
+  box-sizing: border-box;
+  height: 120px;
+  word-break: break-all;
+}
+
+button {
+  font-size: 100%;
+  font-family: inherit;
+  font-weight: bold;
+  float: right;
+  color: inherit;
+  background: #eee;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 6px 12px;
+}
+
+button:disabled {
+  cursor: default;
+  color: #aaa;
+  text-decoration: none;
+}
+
+footer {
+  text-align: center;
+  font-size: 80%;
+  text-transform: uppercase;
+  font-weight: bold;
+  margin: 2.5em 0;
+}
+
+footer * {
+  margin: 0 0.5em;
+}
+
+footer a {
+  text-decoration: none;
+}
+
+.licenses {
+  white-space: pre-wrap;
+  font-size: 80%;
+}
